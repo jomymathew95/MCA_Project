@@ -1,0 +1,67 @@
+USE [testdb]
+GO
+/****** Object:  StoredProcedure [dbo].[SPcurrentbill]    Script Date: 05-08-2019 09:28:39 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER procedure [dbo].[SPcurrentbill]
+(
+@customername varchar(50)='',
+@UNIT float
+
+--select * from customer_master
+--select * from customer_master
+--exec SPcurrentbill 'robinson',175
+--exec SPcurrentbill 175
+)
+
+AS
+	
+BEGIN
+DECLARE @sladid INT;
+DECLARE @customer_id INT;
+DECLARE @FROMUNIT INT;
+DECLARE @TOUNIT INT;
+DECLARE @RATE float;
+DECLARE @AMT float =0;
+declare @customer_unit float = @UNIT;
+
+
+
+		SELECT @sladid=A.slabid,@customer_id=A.customer_id FROM customer_master A WHERE @customername=A.name
+
+
+
+
+
+
+
+		DECLARE ROW_CURSOR1 CURSOR FOR SELECT B.from_unit,B.to_unit,B.rate FROM slab_master B WHERE B.slabid=@sladid order by from_unit;
+		OPEN ROW_CURSOR1;
+		FETCH NEXT FROM ROW_CURSOR1 INTO @FROMUNIT,@TOUNIT,@RATE;
+WHILE @@FETCH_STATUS=0
+		begin
+
+		SET @FROMUNIT= case when (@FROMUNIT = 0) then 1 else @FROMUNIT end;
+			if @UNIT > (@TOUNIT-@FROMUNIT+1)
+		begin
+			SET @AMT += (@TOUNIT-@FROMUNIT+1)*@RATE;
+			SET @UNIT -= (@TOUNIT-@FROMUNIT+1);
+		end
+		else
+		begin
+			SET @AMT += @UNIT*@RATE;
+			break;
+		end
+
+
+		
+		fetch next from ROW_CURSOR1 into @FROMUNIT,@TOUNIT,@RATE;
+	end
+
+close ROW_CURSOR1;
+	deallocate ROW_CURSOR1;
+	
+select @customer_id as Customer_Id, @customername as Customer_Name, @customer_unit as Unit, @AMT as Total_Amount; 
+END

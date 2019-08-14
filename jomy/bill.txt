@@ -1,0 +1,74 @@
+--select * from slab_master order by slabid,from_unit
+--select * from customer_master
+--exec bill_calc 175,'Albert'
+--exec bill_calc 175,'Robinson'
+--exec bill_calc 175,'Edwin'
+--exec bill_calc 175
+
+ALTER procedure [dbo].[bill_calc]
+(
+	@customer_unit float,
+	@customer_name varchar(50) = ''
+)
+as
+begin
+	declare @amount float = 0;
+	declare @slabid int;
+	declare @fromunit int;
+	declare @tounit int;
+	declare @rate float;
+	declare @customerid int;
+	declare @cu float = @customer_unit;
+	declare @temptable table(t_customerid int, t_customer_name varchar(50), t_cu float, t_amount float);
+
+	declare f_sb cursor for select a.slabid,a.customer_id from customer_master a where 
+		a.name = case when @customer_name = '' then a.name else @customer_name end; 
+	open f_sb;
+	fetch next from f_sb into @slabid,@customerid;
+	--close f_sb;
+	--deallocate f_sb;
+	--select @slabid=a.slabid,@customerid=a.customer_id from customer_master a where a.name = @customer_name;
+	while @@FETCH_STATUS = 0
+	begin 
+			set @amount = 0;
+			set @customer_unit = @cu;
+			declare f_rs cursor for select b.from_unit,b.to_unit,b.rate from slab_master b where b.slabid  = @slabid order by from_unit;
+	
+			open f_rs;
+			
+			fetch next from f_rs into @fromunit,@tounit,@rate ;
+			
+			while @@FETCH_STATUS = 0
+			begin
+				
+				SET @fromunit= case when (@fromunit = 0) then 1 else @fromunit end;
+				--select @customer_unit;
+
+				if @customer_unit > (@tounit-@fromunit+1)
+				begin
+					SET @amount += (@tounit-@fromunit+1)*@rate;
+					SET @customer_unit -= (@tounit-@fromunit+1);
+				end
+				else
+				begin
+					SET @amount += @customer_unit*@rate;
+					break;
+				end
+
+				fetch next from f_rs into @fromunit,@tounit,@rate;
+			end
+
+			close f_rs;
+			deallocate f_rs;
+
+			--select @customerid as CustomerId, @customer_name as CustomerName, @cu as Unit, @amount as bill,@amount; 
+			select @customer_name=a.name from customer_master a where a.customer_id = @customerid;
+			insert into @temptable values(@customerid,@customer_name,@cu,@amount);
+
+			fetch next from f_sb into @slabid,@customerid;
+	end
+	close f_sb;
+	deallocate f_sb;
+	select * from @temptable;
+	
+end;

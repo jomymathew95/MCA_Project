@@ -1,0 +1,112 @@
+USE [testdb]
+GO
+/****** Object:  StoredProcedure [dbo].[ajin_brokeragesum2]    Script Date: 13-08-2019 18:56:21 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER procedure [dbo].[ajin_brokeragesum2]
+(
+      --exec ajin_brokeragesum2 '2017-01-01','','1'
+      --exec ajin_brokeragesum2
+	  @trandate datetime='',
+	  @product varchar(25)='',
+	  @clientid int=''
+)
+as 
+begin
+	
+ declare 
+	@protype varchar(10)=@product,
+	--@prod varchar(25)=@product, 	
+	@c_id int=@clientid
+
+
+select c.clientid,c.tradecode,c.name,b.tran_date,b.client_id,b.nsevol,b.nsebrok,b.bsevol,b.bsebrok into #ttable
+ from ajin_client c inner join ajin_brokerage b on c.clientid=b.client_id 
+
+
+if (@clientid='') and (@trandate='') and (@product='')
+begin
+	select t.clientid,t.tradecode,t.tran_date,t.name, sum(t.nsebrok) as nsebrok_total,sum(t.nsevol) as nsevol_total,
+	sum(bsebrok) as bsebrok_total,sum(bsevol) as bsevol_total from #ttable t group by t.clientid,t.tradecode,t.tran_date,t.name
+
+end	
+
+if (@trandate='') and (@product='') and (@clientid!='')
+ begin
+  select t.tradecode as tradecode,t.name as name,sum(nsebrok) as nsebrok_total,sum(nsevol) as nsevol_total,sum(bsebrok) as bsebrok_total,sum(bsevol) as bsevol_total from #ttable t 
+  where t.clientid=@clientid group by t.tradecode,t.name
+ end
+
+
+if (@clientid='') and (@product='') and (@trandate!='')
+ begin 
+  select t.tran_date,sum(nsebrok) as nsebrok_total,sum(nsevol) as nsevol_total,sum(bsebrok) as bsebrok_total,sum(bsevol) as bsevol_total from #ttable t
+  where t.tran_date= @trandate group by t.tran_date
+ end
+
+
+
+if (@clientid='') and (@trandate='')
+begin
+	if (@product='nse') 
+	 begin 
+		select @protype as product,sum(t.nsebrok) as nse_broktotal,sum(t.nsevol) as nse_voltotal from #ttable t 
+	 end
+
+	else if (@product='bse')
+	begin 
+		select @protype as product,sum(t.bsebrok) as bse_broktotal,sum(t.bsevol) as bse_voltotal from #ttable t 
+	end 
+
+end
+ 
+
+
+ if (@trandate!='') and (@product='nse') and (@clientid!='')
+ begin
+	select t.clientid,t.tradecode,t.tran_date,t.name, sum(t.nsebrok) as nsebrok_total,sum(t.nsevol) as nsevol_total from #ttable t
+	 where @trandate=t.tran_date and @clientid=t.clientid group by t.clientid,t.tradecode,t.tran_date,t.name
+ end
+ else if (@trandate!='') and (@product='bse') and (@clientid!='')
+ begin
+	select t.clientid,t.name,sum(t.bsebrok) as bsebrok_total,sum(t.bsevol) as bsevol_total from #ttable t
+	 where @trandate=t.tran_date and @clientid=t.clientid group by t.clientid,t.tradecode,t.tran_date,t.name
+ end
+
+
+ if(@clientid!='') and (@trandate!='') and (@product='')
+	begin
+		select t.clientid as client_id,t.tran_date as date, sum(nsebrok) as nsebrok_total,sum(nsevol) as nsevol_total,sum(bsebrok) as bsebrok_total,sum(bsevol) as bsevol_total from #ttable t
+		 where @trandate=t.tran_date and @clientid=t.clientid group by t.clientid,t.tran_date
+	end
+
+
+
+
+
+ if(@clientid!='') and (@trandate='') and (@product='nse') 
+	begin 
+		select t.clientid,@protype as product,sum(nsebrok) as nsebrok_total,sum(nsevol) as nsevol_total from #ttable t where @clientid=t.clientid group by t.clientid 
+	 end
+
+	else if (@clientid!='') and (@trandate='') and (@product='bse')
+	begin 
+		select t.clientid,@protype as product,sum(bsebrok) as bsebrok_total,sum(bsevol) as bsevol_total from #ttable t where @clientid=t.clientid group by t.clientid
+	end 
+
+
+
+
+ if(@clientid='') and (@trandate!='') and (@product='nse') 
+ begin
+	select t.tran_date,@protype as product,sum(nsebrok) as nsebrok_total,sum(nsevol) as nsevol_total from #ttable t where @trandate=t.tran_date group by t.tran_date
+ end
+ else if (@clientid!='') and (@trandate='') and (@product='bse')
+	begin 
+		select t.tran_date,@protype as product,sum(bsebrok) as bsebrok_total,sum(bsevol) as bsevol_total from #ttable t where @trandate=t.tran_date group by t.tran_date
+	end 
+
+end
