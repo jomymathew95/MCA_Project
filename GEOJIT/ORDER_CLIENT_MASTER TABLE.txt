@@ -1,0 +1,104 @@
+create table jomy_client_master(id int,name varchar(25))
+insert into jomy_client_master(id,name)values(1,'amal')
+insert into jomy_client_master(id,name)values(2,'mathew')
+insert into jomy_client_master(id,name)values(3,'samad')
+
+create table jomy_order_details(id int,trade_date date,security varchar(50),buy_or_sell varchar(10),qty int,rate float,orderid int)
+
+
+select * from jomy_order_details
+
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-04-01','ACC','B',1000,200,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-04-01','ACC','B',200,250,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-05-05','ACC','S',50,300,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-05-05','ACC','S',150,285,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-05-30','ACC','S',900,260,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-06-06','ACC','S',100,255,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-06-06','ACC','B',450,265,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-06-06','ACC','B',350,275,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-06-06','ACC','B',300,285,3)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-07-07','ACC','S',150,300,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-08-10','ACC','S',850,310,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2016-08-10','ACC','S',100,305,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2017-03-01','INF','B',250,10,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2017-03-01','INF','B',150,11,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2017-03-01','INF','S',50,12,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(1,'2017-03-01','INF','S',350,13,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-01-01','WIPRO','B',100,20,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-01-01','WIPRO','S',25,21,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-01-01','WIPRO','S',35,22,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-01-01','WIPRO','S',40,23,3)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-02-02','WIPRO','B',350,25,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-02-02','WIPRO','B',350,26,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-02-02','WIPRO','B',300,27,3)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-02-05','WIPRO','S',300,28,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-02-06','WIPRO','S',300,25,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(2,'2017-02-06','WIPRO','S',400,26,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-01','ITC','B',1000,10,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-02','ITC','S',250,10,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-02','ITC','S',350,10,2)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-04','ITC','B',500,11,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-04','ITC','B',600,12,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-09','ITC','S',250,13,1)
+insert into jomy_order_details(id,trade_date,security,buy_or_sell,qty,rate,orderid)values(3,'2017-05-09','ITC','S',250,14,2)
+
+
+UPDATE jomy_order_details SET qty=50 FROM jomy_order_details WHERE trade_date='2016-05-05' AND rate=300
+UPDATE jomy_order_details SET trade_date='2016-05-25' FROM jomy_order_details WHERE trade_date='2016-05-05' AND rate=285
+
+
+alter procedure jomy_order
+
+
+--exec jomy_order
+as
+begin
+
+declare @name varchar(25)
+declare @id int
+declare @t_date date
+declare @security varchar(25)
+declare @b_s varchar(20)
+declare @qty int
+declare @rate float
+declare @orderid int
+
+
+SELECT c.name,o.id,o.trade_date,o.security,o.buy_or_sell,o.qty,o.rate,o.orderid,o.qty*o.rate as value into #temp1 FROM jomy_order_details o
+join jomy_client_master c on c.id=o.id
+
+
+--where o.buy_or_sell='b' order by trade_date
+
+--select * from #temp1 
+
+--SELECT c.name,o.id,o.trade_date,o.security,o.buy_or_sell,o.qty,o.rate,o.orderid,o.qty*o.rate as value into #temp2 FROM jomy_order_details o
+--join jomy_client_master c on c.id=o.id
+--where o.buy_or_sell='s' order by trade_date
+
+
+--select * from #temp2 order by trade_date
+
+
+
+
+
+ 
+/*
+ declare buy_cur cursor for select  t.name,t.id,t.trade_date,t.security,t.buy_or_sell,t.qty,t.rate,t.orderid from #temp1 t
+ open buy_cur
+ fetch next from buy_cur into @name,@id,@t_date,@security,@b_s,@qty,@rate,@orderid
+ while @@FETCH_STATUS=0
+ begin
+
+
+ end
+
+ */
+
+
+ select t.id,t.name,sum(t.value) as value_b into #temp2 from #temp1 t where t.id=1 and t.buy_or_sell='b'
+  group by t.id,t.name,t.trade_date,t.security,t.buy_or_sell,t.qty,t.rate,t.orderid
+
+  select * from #temp2
+end
