@@ -1,0 +1,92 @@
+USE [testdb]
+GO
+/****** Object:  StoredProcedure [dbo].[test]    Script Date: 8/22/2019 8:17:46 PM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER proc [dbo].[test] as
+--select * from mas
+--alter table mas add slno int identity
+
+--drop table #output
+--select * into #buys from mas where buy_or_sell = 'B'
+--select * into #Sells from mas where buy_or_sell = 'S'
+--close buy
+--deallocate buy
+--close sell
+--deallocate sell
+--set nocount on 
+--truncate table #output
+declare @id int, @bsec varchar(32),@bqty int, @brate numeric(15,3),@sqty int, @srate numeric(15,3), 
+		@ssec varchar(32),@balqty int=0, @temprate numeric(15,3), @sbalqty int = 0 ,@tempsqty int=0
+		,@count int=0
+		
+
+create table #output(Sec varchar(32), bqty int, brate numeric(15,3), sqty int, srate numeric(15,3),counts int)
+
+declare Sell cursor for select Security,qty,rate from #Sells 
+open Sell
+
+declare buy cursor for select Security,qty,rate from #buys where security='ACC'
+open buy
+fetch next from buy into @bsec ,@bqty , @brate
+
+while @@FETCH_STATUS = 0 
+Begin
+	set @count = @count+1
+	--print @count
+	set @balqty = @balqty + @bqty
+	fetch next from Sell into @ssec ,@sqty , @srate
+	while @@FETCH_STATUS = 0
+	Begin
+	   if @tempsqty >0
+	   Begin
+			
+			insert into  #output select @bsec,@balqty,@brate,case when @tempsqty > @balqty then @balqty else @tempsqty end,@srate,0
+			--if @tempsqty > @balqty
+			--begin
+			--set @tempsqty = @tempsqty-@balqty
+			----select  @tempsqty a
+			--end
+			 if @balqty>=@tempsqty  
+			set @balqty = @balqty - @tempsqty
+			else
+			begin
+			 set @tempsqty = @tempsqty-@balqty
+			 set @balqty = 0
+			 end
+			set @tempsqty= @tempsqty - @balqty
+			--select @balqty a
+			if @balqty=0 break;
+	   End
+	   set @sbalqty =  @sqty
+
+	   if @count=5 select @balqty,@sqty
+	   if @sqty > @balqty
+	   begin
+	    set @sbalqty = @balqty
+		set @tempsqty = @sqty-@balqty 
+		--print @tempsqty
+	   end	
+	   insert into  #output select @bsec,@balqty,@brate,@sbalqty,@srate,@count
+	   set @balqty = @balqty - @sbalqty
+
+	   if  @balqty - @sbalqty >0 
+	   fetch next from Sell into @ssec ,@sqty , @srate
+	   else  BREAK;
+	End 
+
+
+	--insert into #output select @bsec,@bqty,@brate,0,0
+	--if @count = 3
+	--return
+	fetch next from buy into @bsec ,@bqty , @brate
+End
+close buy
+deallocate buy
+close sell
+deallocate sell
+select * from #output
+select * from #Sells
+select * from #buys

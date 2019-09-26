@@ -1,0 +1,22 @@
+procedure Tfrmchangereqform.dependencysearch;
+begin
+   cmbMobileRelation.Items.clear;
+   cmbEmailRelation.Items.Clear;
+   with dependencysrh do
+         begin
+             Close;
+             sql.Clear;
+             sql.Add(' Exec SPgetDependencymaster :type');
+             ParamByName('type').AsString       := labtype.Caption;
+             open;
+             
+              while not eof do
+              begin
+                cmbMobileRelation.Items.Add(FieldByName('dependency').AsString);
+                cmbEmailRelation.Items.Add(FieldByName('dependency').AsString);
+                next;
+              end;
+          end
+
+
+end;
