@@ -1,0 +1,1379 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Data;
+using System.IO;
+using System.Drawing.Imaging;
+using System.Drawing;
+using System.Data.SqlClient;
+using System.Text;
+using System.Web.UI.HtmlControls;
+
+public partial class AccountClosureRequest : System.Web.UI.Page
+{
+    ConnectionClass obj = new ConnectionClass();
+    string Euser;
+    string ScanOnly;
+    string userFolder = string.Empty;
+    DataSet ds1 = new DataSet();
+    DataSet ds2 = new DataSet();
+    DataSet dss = new DataSet();
+    DataSet ds3 = new DataSet();
+
+    protected void Page_Load(object sender, EventArgs e)
+    {
+        WebUtil.getSession();
+        WebUtil.CheckSessionOut();
+
+        Euser = Session["UserCode"].ToString();
+        userFolder = Server.MapPath("~/ClientNet/AccountClosureFiles") + @"\" + Euser;
+        lblClosureType.Visible = true;
+        rdbtnClosuretype.Visible = true;
+        Table2.Visible = true;
+        lblCmnt.Text = "";
+
+        if (!IsPostBack)
+        {
+            WebUtil.CheckAccess(4257);
+            WebUtil.Userloginsert(4257);
+
+            if (!Directory.Exists(Server.MapPath("AccountClosureFiles")))
+            {
+                Directory.CreateDirectory(Server.MapPath("AccountClosureFiles"));
+            }
+
+            if (Directory.Exists(userFolder))
+            {
+                Directory.Delete(userFolder, true);
+            }
+
+            //if (Session["UserLocation"].ToString() == "HO")
+            //{
+            //    rdbtnmain.Items.Remove(rdbtnmain.Items.FindByValue("1"));
+            //}
+
+            checkApprovalAccess();
+
+            if ((Session["UserLocation"].ToString() != "HOGT") && (Session["UserLocation"].ToString() != "HO"))
+            {
+                rdbtnmain.Items.Remove(rdbtnmain.Items.FindByValue("3"));
+            }
+
+            rdbtnmain.SelectedValue = "0";
+            pnlHO.Visible = false;
+            panelreport.Visible = false;
+            txtLocation.Enabled = true;
+            txtTradecode.Enabled = true;
+            imgBtnTradeCode.Enabled = true;
+            drpdwnDPId.Enabled = false;
+            txtDPAccNo.Enabled = false;
+            lblMsg.Text = "";
+            imgbtnDpAcno.Enabled = false;
+            Table2.Visible = true;
+            Panel3.Visible = false;
+            Panel1.Visible = false;
+            bnkdetail.Visible = false;
+
+            string ssql2 = "select top 50 Curlocation,Tradecode,Pan_Gir from Client (nolock) where 1=1";
+            imgBtnTradeCode.Attributes.Add("OnClick", "return search(0,'" + ssql2 + "','Curlocation,Tradecode,Pan_Gir','','Curlocation','Curlocation,Tradecode','txtLocation,txtTradecode','No','N');");
+        }
+    }
+
+    private void checkApprovalAccess()
+    {
+        DataSet dsAccess = new DataSet();
+        string accessLocation = "", accessFlag = "";
+        string[] param = { 
+                                "@Euser", Session["UserCode"].ToString(),
+                                "@Flag","14"
+                             };
+
+        dsAccess = obj.SPGetDS("SpSelectClosureRqstClients", param);
+        if (dsAccess.Tables[0].Rows.Count > 0)
+        {
+            accessLocation = dsAccess.Tables[0].Rows[0]["Location"].ToString();
+            accessFlag = dsAccess.Tables[0].Rows[0]["Flag"].ToString();
+
+            if ((accessFlag.ToString() == "N") && (accessLocation.ToString() == "HO"))
+            {
+                rdbtnmain.Items.Remove(rdbtnmain.Items.FindByValue("1"));
+            }
+        }
+    }
+
+    protected void rdbtnClosuretype_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        //---Closure Type Index Change---//
+
+        if (rdbtnClosuretype.SelectedIndex == 0)
+        {
+            txtLocation.Enabled = true;
+            txtTradecode.Enabled = true;
+            imgBtnTradeCode.Enabled = true;
+            drpdwnDPId.Enabled = false;
+            txtDPAccNo.Enabled = false;
+            imgbtnDpAcno.Enabled = false;
+            bnkdetail.Visible = false;
+            clearall();
+        }
+        else if (rdbtnClosuretype.SelectedIndex == 1)
+        {
+            txtTradecode.Enabled = false;
+            txtLocation.Enabled = false;
+            imgBtnTradeCode.Enabled = false;
+            drpdwnDPId.Enabled = true;
+            txtDPAccNo.Enabled = true;
+            imgbtnDpAcno.Enabled = true;
+            bnkdetail.Visible = true;
+            clearall();
+        }
+        else
+        {
+            txtLocation.Enabled = true;
+            txtTradecode.Enabled = true;
+            imgBtnTradeCode.Enabled = true;
+            drpdwnDPId.Enabled = true;
+            txtDPAccNo.Enabled = true;
+            imgbtnDpAcno.Enabled = true;
+            bnkdetail.Visible = true;
+            clearall();
+        }
+    }
+
+    protected void btnView_Click(object sender, EventArgs e)
+    {
+        //--Viewing Details Of the Selected Clients ---//
+        try
+        {
+            if (Directory.Exists(userFolder))
+            {
+                Directory.Delete(userFolder, true);
+            }
+
+            if (rdbtnClosuretype.SelectedIndex == 0)
+            {
+                drpdwnForm.Items[1].Enabled = false;
+                drpdwnForm.Items[2].Enabled = true;
+            }
+            else if (rdbtnClosuretype.SelectedIndex == 1)
+            {
+                drpdwnForm.Items[1].Enabled = true;
+                drpdwnForm.Items[2].Enabled = false;
+            }
+            else if (rdbtnClosuretype.SelectedIndex == 2)
+            {
+                drpdwnForm.Items[1].Enabled = true;
+                drpdwnForm.Items[2].Enabled = true;
+            }
+
+            GridView1.DataSource = null;
+            GridView1.DataBind();
+            txtRqstDate.Text = "";
+            lblMsg.Text = "";
+            drpdwnClosureReason.SelectedValue = "";
+            drpdwnForm.SelectedValue = "";
+
+            string[] param = {
+                             "@Location",txtLocation.Text.Trim(),
+                             "@TradeCode",txtTradecode.Text.Trim(),
+                             "@type", rdbtnClosuretype.SelectedValue,
+                             "@DPid",drpdwnDPId.SelectedValue,
+                             "@DpClientid",txtDPAccNo.Text.Trim()
+                         };
+            ds1 = obj.SPGetDS("SPClosureRequest_Web", param);
+
+            if (ds1.Tables.Count > 0)
+            {
+                if (ds1.Tables[0].Rows[0]["Status"].ToString() == "0")
+                {
+                    grdReport.DataSource = ds1.Tables[1];
+                    grdReport.DataBind();
+                    panelreport.Visible = true;
+                    lblbname.Text = ds1.Tables[1].Rows[0]["BankName"].ToString();
+                    lblacno.Text = ds1.Tables[1].Rows[0]["BankAcnNo"].ToString();
+                    lblifsc.Text = ds1.Tables[1].Rows[0]["IFSCCode"].ToString();
+                }
+                else
+                {
+                    grdReport.DataSource = null;
+                    grdReport.DataBind();
+                    lblMsg.Text = ds1.Tables[0].Rows[0]["Msg"].ToString();
+                    panelreport.Visible = false;
+                }
+            }
+        }
+        catch (Exception Ex)
+        {
+            lblMsg.Text = Ex.Message;
+        }
+    }
+
+    protected void btnCancel_Click(object sender, EventArgs e)
+    {
+        clearall();
+    }
+
+    private void clearall()
+    {
+        panelreport.Visible = false;
+        grdReport.DataSource = null;
+        grdReport.DataBind();
+        txtLocation.Text = "";
+        txtTradecode.Text = "";
+        txtDPAccNo.Text = "";
+        lblMsg.Text = "";
+        txtRqstDate.Text = "";
+        drpdwnForm.SelectedValue = "";
+        drpdwnClosureReason.SelectedValue = "";
+        drpdwnDPId.SelectedValue = "";
+        btnSave.Enabled = true;
+        grdReportApproval.DataSource = null;
+        grdReportApproval.DataBind();
+        grdHoReport.DataSource = null;
+        grdHoReport.DataBind();
+    }
+
+    private void tradeandDPvalidation()
+    {
+        //---Checking Validation ----//
+        int i = 0;
+        lblMsg.Text = "";
+
+        if (Convert.ToDecimal(grdReport.Rows[i].Cells[10].Text) < 0)
+        {
+            lblMsg.Text += "<li>Debit amount in client ledger, Please clear the debit balance</li>";
+        }
+        if (Convert.ToDecimal(grdReport.Rows[i].Cells[10].Text) > 0)
+        {
+            lblMsg.Text += "<li>Credit balance available in client ledger, Please clear (via Pay out request)</li>";
+        }
+        if (grdReport.Rows[i].Cells[11].Text != "0.00" || grdReport.Rows[i].Cells[22].Text != "0.00")
+        {
+            lblMsg.Text += "<li>Customer has holdings in demat account, Please proceed after clearing demat holdings</li>";
+        }
+        if (grdReport.Rows[i].Cells[12].Text != "0.00")
+        {
+            lblMsg.Text += "<li>Pending balance in ledger (Pending Receipts), Please proceed after clearing</li>";
+        }
+        if (grdReport.Rows[i].Cells[14].Text != "0.00")
+        {
+            lblMsg.Text += "<li>Security margin value in client ledger, Please proceed after clearing</li>";
+        }
+        if (grdReport.Rows[i].Cells[15].Text == "Y")
+        {
+            lblMsg.Text += "<li>Margin Trading enabled in this account</li>";
+        }
+        if (grdReport.Rows[i].Cells[16].Text == "Y")
+        {
+            lblMsg.Text += "<li>Auto pledge enabled in Trade code</li>";
+        }
+
+        if ((rdbtnClosuretype.SelectedIndex == 0) || (rdbtnClosuretype.SelectedIndex == 2))
+        {
+            string lblPAN = ((Label)grdReport.Rows[0].Cells[7].FindControl("lblclntTradePAN")).Text;
+
+            string[] param = {
+                             "@ClientId",grdReport.Rows[i].Cells[1].Text,
+                             "@Pan",lblPAN.Substring(lblPAN.IndexOf(':') + 1),
+                             "@ClientStatus", "CLOSED",
+                             "@Location",grdReport.Rows[i].Cells[2].Text,
+                             "@TradeCode",grdReport.Rows[i].Cells[3].Text,
+                             "@ModuleId","0"
+                         };
+
+            //Response.Write("SpCheckClientValidation_Web" + grdReport.Rows[i].Cells[1].Text + "," + lblPAN.Substring(lblPAN.IndexOf(':') + 1) + "," + "CLOSED" + "," + grdReport.Rows[i].Cells[2].Text + "," + grdReport.Rows[i].Cells[3].Text + "," + "0");
+            //Response.End();
+
+            DataSet ds = obj.SPGetDS("SpCheckClientValidation_Web", param);
+            lblMsg.Text += ds.Tables[0].Rows[0]["Message"].ToString();
+
+            if ((ds.Tables[0].Rows[0]["SerialNo"].ToString() == "1") && (lblMsg.Text == ""))
+            {
+                savedetails();
+            }
+            else
+            {
+                return;
+            }
+        }
+        else if ((rdbtnClosuretype.SelectedIndex == 1) && (lblMsg.Text == ""))
+        {
+            savedetails();
+        }
+    }
+
+    protected void btnSave_Click(object sender, EventArgs e)
+    {
+        if (!Directory.Exists(userFolder))
+        {
+            lblMsg.Text = "Please Upload Scanned Documents";
+        }
+        else
+        {
+            if (fileUploadDP.HasFile)
+            {
+                if (!Directory.Exists(userFolder))
+                {
+                    Directory.CreateDirectory(userFolder);
+                }
+                FileInfo fi = new FileInfo(Path.GetFileName(fileUploadDP.PostedFile.FileName));
+                fileUploadDP.PostedFile.SaveAs((userFolder + "/") + drpdwnForm.SelectedValue + fi.Extension);
+
+                try
+                {
+                    tradeandDPvalidation();
+                }
+                catch (Exception Ex)
+                {
+                    lblMsg.Text = Ex.Message;
+                }
+            }
+            else
+            {
+                try
+                {
+                    tradeandDPvalidation();
+                }
+                catch (Exception Ex)
+                {
+                    lblMsg.Text = Ex.Message;
+                }
+            }
+        }
+    }
+
+    private void savedetails()
+    {
+        //---Saving Client Closure Request ---//
+        if (!Directory.Exists(userFolder))
+        {
+            lblMsg.Text = "Please Upload Scanned Documents";
+        }
+        else
+        {
+            string SerialNo;
+            int i = 0, flag = 0, flag1 = 0;
+            string stats = "N";
+            string BRANCHorHO = "B";
+            string imgMsg = string.Empty;
+
+            if ((Session["UserLocation"].ToString() == "HOGT") || (Session["UserLocation"].ToString() == "HO"))
+            {
+                BRANCHorHO = "H";
+            }
+
+            DirectoryInfo dinfo = new DirectoryInfo(userFolder + "/");
+            foreach (var file in dinfo.GetFiles())
+            {
+                if ((rdbtnClosuretype.SelectedIndex == 0 || rdbtnClosuretype.SelectedIndex == 2) && Path.GetFileNameWithoutExtension(file.Name).Trim() == "Closure Form Trade")
+                {
+                    flag = 1;
+                }
+                else if ((rdbtnClosuretype.SelectedIndex == 1 || rdbtnClosuretype.SelectedIndex == 2) && Path.GetFileNameWithoutExtension(file.Name).Trim() == "Closure Form DP")
+                {
+                    flag1 = 1;
+                }
+            }
+
+            if (rdbtnClosuretype.SelectedIndex == 0 && flag != 1)
+            {
+                lblMsg.Text = "Please upload Trade Closure Form to proceed";
+                return;
+            }
+            if (rdbtnClosuretype.SelectedIndex == 1 && flag1 != 1)
+            {
+                lblMsg.Text = "Please upload DP Closure Form to proceed";
+                return;
+            }
+            if (rdbtnClosuretype.SelectedIndex == 2)
+            {
+                if (flag != 1)
+                {
+                    lblMsg.Text = "Please upload Trade Closure Form to proceed";
+                    return;
+                }
+                else if (flag1 != 1)
+                {
+                    lblMsg.Text = "Please upload DP Closure Form to proceed";
+                    return;
+                }
+            }
+
+            
+            string CdslRefNo = grdReport.Rows[i].Cells[21].Text.Replace("&nbsp;", "");
+            string Region = grdReport.Rows[i].Cells[0].Text.Replace("&nbsp;", "");
+            string Location = grdReport.Rows[i].Cells[2].Text.Replace("&nbsp;", "");
+            string Tradecode = grdReport.Rows[i].Cells[3].Text.Replace("&nbsp;", "");
+            string DPid = grdReport.Rows[i].Cells[4].Text.Replace("&nbsp;", "");
+            string DPClntId = grdReport.Rows[i].Cells[5].Text.Replace("&nbsp;", "");
+            string Name = ((Label)grdReport.Rows[0].Cells[6].FindControl("lblTradeNm")).Text;
+            string DPFrst = ((Label)grdReport.Rows[0].Cells[6].FindControl("lblDPFrstHldr")).Text;
+            string DPScnd = ((Label)grdReport.Rows[0].Cells[6].FindControl("lblDPScndHldr")).Text;
+            string DPThrd = ((Label)grdReport.Rows[0].Cells[6].FindControl("lblThrdHldr")).Text;
+            string tradePAN = ((Label)grdReport.Rows[0].Cells[7].FindControl("lblclntTradePAN")).Text;
+            string DPPAN = ((Label)grdReport.Rows[0].Cells[7].FindControl("lblDPpan")).Text;
+            string TradeStatus = grdReport.Rows[i].Cells[8].Text.Replace("&nbsp;", "");
+            string DPStatus = grdReport.Rows[i].Cells[9].Text.Replace("&nbsp;", "");
+            string LedgerBalance = grdReport.Rows[i].Cells[10].Text.Replace("&nbsp;", "");
+            string Holdvalue = grdReport.Rows[i].Cells[11].Text.Replace("&nbsp;", "0.00");
+            string AmcDue = grdReport.Rows[i].Cells[13].Text.Replace("&nbsp;", "");
+            string Autopleadged = grdReport.Rows[i].Cells[16].Text.Replace("&nbsp;", "");
+            string MobileNo = grdReport.Rows[i].Cells[17].Text.Replace("&nbsp;", "");
+            string MTF = grdReport.Rows[i].Cells[18].Text.Replace("&nbsp;", "");
+
+            string[] param2 = {
+                                 "@Region",Region,
+                                 "@Location",Location,
+                                 "@TradeCode",Tradecode,
+                                 "@name",Name,
+                                 "@mobileNo",MobileNo,
+                                 "@Ledgerbalance",LedgerBalance,
+                                 "@Dpid",DPid,
+                                 "@Dpclientid",DPClntId,
+                                 "@Holdvalue",Holdvalue,
+                                 "@remarks",drpdwnClosureReason.SelectedValue,
+                                 "@status",stats,
+                                 "@Euser",Euser,
+                                 "@Type",rdbtnClosuretype.SelectedValue.ToString(),
+                                 "@TradeStatus",TradeStatus,
+                                 "@DPStatus",DPStatus,
+                                 "@CDSLINtRefNo",CdslRefNo,
+                                 "@PhoneNo",MobileNo,
+                                 "@RequestDate",txtRqstDate.Text,
+                                 "@BRANCHorHO",BRANCHorHO,
+                                 "@Amc" ,AmcDue,
+                                 "@dpfrst",DPFrst,
+	                             "@dpscnd",DPScnd,
+                                 "@dpthrd",DPThrd,
+                                 "@pantrade",tradePAN,
+                                 "@pandp",DPPAN,
+                                 "@Autopleadged",Autopleadged,
+                                 "@MTF",MTF,
+                                 "@ELoc",Session["UserLocation"].ToString()
+                             };
+
+
+            DataSet ds = obj.SPGetDS("SPSaveClientClosureRequest_Web", param2);
+            if (ds.Tables[0].Rows.Count > 0)
+            {
+                lblMsg.Text = ds.Tables[0].Rows[0]["Msg"].ToString();
+                txtRqstDate.Text = "";
+                drpdwnClosureReason.SelectedValue = "";
+                drpdwnForm.SelectedValue = "";
+
+                if (ds.Tables[0].Rows[0]["Status"].ToString() == "1")
+                {
+                    Directory.Delete(userFolder, true);
+                    return;
+                }
+                else
+                {
+                    SerialNo = ds.Tables[0].Rows[0]["SerialNo"].ToString();
+
+                    //--- Saving Image ---//
+                    DirectoryInfo dir = new DirectoryInfo(userFolder + "/");
+
+                    foreach (var file in dir.GetFiles())
+                    {
+                        int imageLength = Convert.ToInt32(file.Length);
+                        byte[] bytes = File.ReadAllBytes(file.FullName);
+                        string ext = Path.GetExtension(file.Name);
+                        insertImage(imageLength, Path.GetFileNameWithoutExtension(file.Name), SerialNo, bytes, ext.Substring(ext.IndexOf('.') + 1));
+                        btnSave.Enabled = false;
+                    }
+                    Directory.Delete(userFolder, true);
+
+                    GridView1.DataSource = null;
+                    GridView1.DataBind();
+                }
+            }
+            else
+            {
+                lblMsg.Text = "Data not saved";
+            }
+
+        }
+    }
+
+    private void insertImage(int imgLength, string imgRemarks, string ScanId, byte[] ImgByte, string ext)
+    {
+        try
+        {
+            //Image Insertion log
+            string strQuery1 = "[imagedb].[dbo].spUploadImage2DB_log";
+            SqlCommand cmd1 = new SqlCommand(strQuery1);
+            cmd1.CommandType = CommandType.StoredProcedure;
+            cmd1.Parameters.Add("@CompanyCode", "GFSL");
+            cmd1.Parameters.Add("@imgTitle", ScanId);
+            cmd1.Parameters.Add("@imgRemarks", imgRemarks);
+            cmd1.Parameters.Add("@Euser", Euser);
+            cmd1.Parameters.Add("@SerialNo", "");
+            cmd1.Parameters.Add("@disno", "");
+            obj.GetDSCommand(cmd1);
+
+            //Image Insertion
+            string strQuery = "[imagedb].[dbo].spUploadImage2DB";
+            SqlCommand cmd = new SqlCommand(strQuery);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.Parameters.Add("@CompanyCode", "GFSL");
+            cmd.Parameters.Add("@imgData", ImgByte);
+            cmd.Parameters.Add("@imgTitle", ScanId);
+            cmd.Parameters.Add("@imgType", ext);
+            cmd.Parameters.Add("@imgLength", imgLength);
+            cmd.Parameters.Add("@imgRemarks", imgRemarks);
+            cmd.Parameters.Add("@Euser", Euser);
+            cmd.Parameters.Add("@disno", "");
+            DataSet ds = obj.GetDSCommand(cmd);
+
+            if (ds.Tables[0].Rows[0]["slno"].ToString() == "1")
+            {
+                UpdateScanStatus(ScanId);
+            }
+        }
+        catch (Exception Ex)
+        {
+            lblMsg.Text = Ex.Message;
+        }
+    }
+
+    private void UpdateScanStatus(string SerialNo)
+    {
+        // -- Updating Scan Flag --//
+        string strQuery = "SpSelectClosureRqstClients";
+        SqlCommand cmd = new SqlCommand(strQuery);
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.Add("@SerialNo", SerialNo);
+        cmd.Parameters.Add("@Flag", "6");
+        obj.GetDSCommand(cmd);
+    }
+
+    private void clearall2()
+    {
+        grdReport.DataSource = null;
+        grdReport.DataBind();
+        panelreport.Visible = false;
+        rdbtnClosuretype.ClearSelection();
+        Table2.Visible = false;
+        grdHoReport.DataSource = null;
+        grdHoReport.DataBind();
+        txtSerialNo.Text = "";
+    }
+
+    private void fillgrid()
+    {
+        try
+        {
+            string[] param = { 
+                                "@Euser",Euser,
+                                "@Flag","1",
+                                "@SerialNo",txtSerialNoBr.Text.Trim()
+                             };
+
+            ds2 = obj.SPGetDS("SpSelectClosureRqstClients", param);
+            if (ds2.Tables[0].Rows.Count > 0)
+            {
+                grdReportApproval.DataSource = ds2.Tables[0];
+                grdReportApproval.DataBind();
+            }
+            else
+            {
+                grdReportApproval.DataSource = null;
+                grdReportApproval.DataBind();
+                lblCmnt.Text = "No Records Found";
+            }
+        }
+        catch (Exception Ex)
+        {
+            lblCmnt.Text = Ex.Message;
+        }
+    }
+
+    protected void grdReportApproval_RowCommand(object sender, GridViewCommandEventArgs e)
+    {
+        if ((e.CommandName == "Approve") || (e.CommandName == "Reject"))
+        {
+            int rowIndex = Convert.ToInt32(e.CommandArgument);
+            GridViewRow row = grdReportApproval.Rows[rowIndex];
+
+            string Status = "";
+            string BMCmnt = (row.FindControl("txtCmnt") as TextBox).Text;
+
+            if (BMCmnt.Trim() == "")
+            {
+                lblCmnt.Text = "Please Enter Branch Remarks";
+                return;
+            }
+            if (e.CommandName == "Approve")
+            {
+                Status = "A";
+            }
+            else
+            {
+                Status = "R";
+            }
+
+            string slno = grdReportApproval.Rows[rowIndex].Cells[0].Text;
+            string[] param = { 
+                                "@SerialNo",grdReportApproval.Rows[rowIndex].Cells[0].Text,
+                                "@Flag","2",
+                                "@Status",Status,
+                                "@Cmnt",BMCmnt,
+                                "@Euser",Euser
+                             };
+
+            DataSet ds = obj.SPGetDS("SpSelectClosureRqstClients", param);
+            fillgrid();
+
+            if (e.CommandName == "Approve")
+            {
+                lblCmnt.Text = "Account Closure entry for serial no " + Convert.ToString(slno) + " approved successfully. Now status is waiting for HO approval.";
+            }
+            else
+            {
+                lblCmnt.Text = "Account Closure Entry for serial no " + Convert.ToString(slno) + " rejected successfully.";
+            }
+        }
+    }
+
+    protected void drpdwnDPId_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        string sql1;
+        string flg = "1";
+        panelreport.Visible = false;
+        grdReport.DataSource = null;
+        grdReport.DataBind();
+        txtDPAccNo.Text = "";
+        lblMsg.Text = "";
+        txtRqstDate.Text = "";
+        drpdwnForm.SelectedValue = "";
+        drpdwnClosureReason.SelectedValue = "";
+
+        if ((drpdwnDPId.SelectedValue.ToString() == "12048900"))
+        {
+            if (rdbtnClosuretype.SelectedValue == "Both" && txtTradecode.Text != "" && txtLocation.Text != "")
+            {
+                sql1 = "select top 50 d.Dpid,d.DPAcno,n.HLDR_INCMTX_PAN from ClientDpAccountCodes(nolock) d,Client(nolock) c,CDSLCLNTMSTR(nolock) n where n.clnt_id = d.DPACNO and d.Clientid = c.ClientId";
+                imgbtnDpAcno.Attributes.Add("OnClick", "return search(6,'" + sql1 + "','DPAcno,HLDR_INCMTX_PAN','','Location','DPAcno','txtDPAccNo','No','N');");
+            }
+            else
+            {
+                sql1 = "select top 50 dpid,CLNT_ID,HLDR_INCMTX_PAN FROM CDSLCLNTMSTR(nolock) where 1=1";
+                imgbtnDpAcno.Attributes.Add("OnClick", "return search(1,'" + sql1 + "','Location,CLNT_ID,HLDR_INCMTX_PAN','','Location','CLNT_ID','txtDPAccNo','No','N');");
+            }
+        }
+        else
+        {
+            if (rdbtnClosuretype.SelectedValue == "Both" && txtTradecode.Text != "" && txtLocation.Text != "")
+            {
+                sql1 = "select top 50 ltrim(rtrim(d.Dpid))Dpid,ltrim(rtrim(d.DPAcno))DPAcno,ltrim(rtrim(Frst_hldr_fin_dtl))Frst_hldr_fin_dtl from ClientDpAccountCodes(nolock) d,Client(nolock) c,NSDclnt_mstr(nolock) n where n.dpid = d.dpid and n.clnt_id = d.DPACNO and d.Clientid = c.ClientId";
+                imgbtnDpAcno.Attributes.Add("OnClick", "return search(2,'" + sql1 + "','DPAcno,Frst_hldr_fin_dtl','','Location','DPAcno','txtDPAccNo','No','N');");
+            }
+            else
+            {
+                sql1 = "select top 50 dpid,CLNT_ID,Frst_hldr_fin_dtl FROM NSDclnt_mstr(nolock) where 1=1";
+                imgbtnDpAcno.Attributes.Add("OnClick", "return search(7,'" + sql1 + "','dpid,CLNT_ID,Frst_hldr_fin_dtl','','Location','CLNT_ID','txtDPAccNo','No','N');");
+            }
+        }
+    }
+
+    protected void rdbtnmain_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        if (rdbtnmain.SelectedValue == "0")
+        {
+            clearall();
+            Panel2.Visible = true;
+            Panel1.Visible = false;
+            pnlHO.Visible = false;
+            lblCmnt.Text = "";
+            lblCmntHO.Text = "";
+            Table2.Visible = true;
+            txtLocation.Enabled = true;
+            txtTradecode.Enabled = true;
+            imgBtnTradeCode.Enabled = true;
+            drpdwnDPId.Enabled = false;
+            txtDPAccNo.Enabled = false;
+            lblMsg.Text = "";
+            imgbtnDpAcno.Enabled = false;
+            rdbtnClosuretype.SelectedValue = "Trade";
+            Panel3.Visible = false;
+            bnkdetail.Visible = false;
+        }
+        else if (rdbtnmain.SelectedValue == "1")
+        {
+            Panel1.Visible = true;
+            pnlHO.Visible = false;
+            Panel2.Visible = false;
+            grdReportApproval.EditIndex = -1;
+            clearall2();
+            fillgrid();
+            Panel3.Visible = false;
+            bnkdetail.Visible = false;
+        }
+        else if (rdbtnmain.SelectedValue == "2")
+        {
+            txtFromDate1.Text = DateTime.Now.ToString("dd-MM-yyyy");
+            txtTodate1.Text = DateTime.Now.ToString("dd-MM-yyyy");
+            clearall2();
+            pnlHO.Visible = true;
+            Panel2.Visible = false;
+            Panel1.Visible = false;
+            grdHoReport.EditIndex = -1;
+            Panel3.Visible = false;
+            bnkdetail.Visible = false;
+        }
+        else
+        {
+            cleardoc();
+            txtFromDtdoc.Text = DateTime.Now.ToString("dd-MM-yyyy");
+            txtTodtDoc.Text = DateTime.Now.ToString("dd-MM-yyyy");
+            Panel1.Visible = false;
+            pnlHO.Visible = false;
+            Panel2.Visible = false;
+            Panel3.Visible = true;
+            bnkdetail.Visible = false;
+            string ssql;
+            string sql;
+            string sql1;
+            string sql2;
+            chkScan.Checked = true;
+            ssql = "Select distinct top 50 Region from Location(Nolock) where 1=1";
+            imbtnRegionDoc.Attributes.Add("OnClick", "return search(0,'" + ssql + "','region','','region','region','txtRegionDoc','No','N');");
+
+            sql = "Select distinct top 50 Region,Location,Description from Location(Nolock) where 1=1";
+            imgLocDoc.Attributes.Add("OnClick", "return search(3,'" + sql + "','location,description','','location','Location','txtLocdoc','No','N');");
+
+            sql1 = "Select distinct top 50 Curlocation,Tradecode,Pan_Gir from Client(nolock) where 1=1";
+            imgTradeCodeDoc.Attributes.Add("OnClick", "return search(4,'" + sql1 + "','Curlocation,Tradecode,Pan_Gir','','curlocation','Tradecode','txtTradedoc','No','N');");
+
+            sql2 = "Select distinct top 50 Curlocation,Tradecode,Pan_Gir from Client(nolock) where 1=1";
+            imgbtnPan.Attributes.Add("OnClick", "return search(0,'" + sql2 + "','Curlocation,Tradecode,Pan_Gir','','curlocation','Pan_Gir','txtPAN','No','N');");
+
+        }
+    }
+
+    private void fillgridHO()
+    {
+        try
+        {
+            string Fromdate = "", Todate = "";
+            if (txtFromDate1.Text != "")
+            {
+                Fromdate = WebUtil.ConvertDate(txtFromDate1.Text, "dd-MM-yyyy", "yyyy/MM/dd");
+            }
+            if (txtTodate1.Text != "")
+            {
+                Todate = WebUtil.ConvertDate(txtTodate1.Text, "dd-MM-yyyy", "yyyy/MM/dd");
+            }
+            string[] param = { 
+                                "@Euser",Euser,
+                                "@Flag","3",
+                                "@SerialNo",txtSerialNo.Text,
+                                "@FromDate",Fromdate,
+                                "@ToDate",Todate
+                             };
+
+            ds3 = obj.SPGetDS("SpSelectClosureRqstClients", param);
+            if (ds3.Tables[0].Rows.Count > 0)
+            {
+                lblCmntHO.Text = "";
+                grdHoReport.DataSource = ds3.Tables[0];
+                grdHoReport.DataBind();
+            }
+            else
+            {
+                grdHoReport.DataSource = null;
+                grdHoReport.DataBind();
+                lblCmntHO.Text = "No Records Found";
+            }
+        }
+        catch (Exception Ex)
+        {
+            lblCmntHO.Text = Ex.Message;
+        }
+    }
+
+    protected void grdReportApproval_RowEditing(object sender, GridViewEditEventArgs e)
+    {
+        lblCmnt.Text = "";
+        grdReportApproval.EditIndex = e.NewEditIndex;
+        fillgrid();
+    }
+
+    protected void grdReportApproval_RowCancelingEdit(object sender, GridViewCancelEditEventArgs e)
+    {
+        lblCmnt.Text = "";
+        grdReportApproval.EditIndex = -1;
+        fillgrid();
+    }
+
+    protected void grdHoReport_RowEditing(object sender, GridViewEditEventArgs e)
+    {
+        grdHoReport.EditIndex = e.NewEditIndex;
+        fillgridHO();
+    }
+    protected void grdHoReport_RowCancelingEdit(object sender, GridViewCancelEditEventArgs e)
+    {
+        grdHoReport.EditIndex = -1;
+        fillgridHO();
+    }
+
+    protected void grdReportApproval_RowDataBound(object sender, GridViewRowEventArgs e)
+    {
+        if (e.Row.RowType == DataControlRowType.DataRow)
+        {
+            Label Name = (Label)(e.Row.FindControl("lblTradeNm1"));
+            Label PAN = (Label)(e.Row.FindControl("lblPANNm1"));
+
+            int RowIndex = grdReportApproval.PageIndex * grdReportApproval.PageSize + e.Row.RowIndex;
+            for (int i = 0; i <= RowIndex; i++)
+            {
+                Name.Text = string.Empty;
+                PAN.Text = string.Empty;
+
+                if (ds2.Tables[0].Rows[i]["Name"].ToString() != "")
+                {
+                    Name.Text = "<b>Trade Holder : </b>" + ds2.Tables[0].Rows[i]["Name"] + "<br />";
+                }
+                if (ds2.Tables[0].Rows[i]["DP_Frst_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<b>DP Holder 1 : </b>" + ds2.Tables[0].Rows[i]["DP_Frst_Hldr"];
+                }
+                if (ds2.Tables[0].Rows[i]["Dp_Scnd_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<br /><b>DP Holder 2 : </b>" + ds2.Tables[0].Rows[i]["Dp_Scnd_Hldr"];
+                }
+                if (ds2.Tables[0].Rows[i]["DP_Thrd_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<br /><b>DP Holder 3 : </b>" + ds2.Tables[0].Rows[i]["DP_Thrd_Hldr"];
+                }
+
+                if (ds2.Tables[0].Rows[i]["Trade_PAN"].ToString() != "")
+                {
+                    PAN.Text = "<b>Trade : </b>" + ds2.Tables[0].Rows[i]["Trade_PAN"] + "<br />";
+                }
+                if (ds2.Tables[0].Rows[i]["DP_Frst_Hldr_PAN"].ToString() != "")
+                {
+                    PAN.Text += "<b>DP : </b>" + ds2.Tables[0].Rows[i]["DP_Frst_Hldr_PAN"];
+                }
+            }
+
+            if (grdReportApproval.EditIndex == e.Row.RowIndex)
+            {
+                DropDownList drpdwnClnRmrkAprv = (DropDownList)e.Row.FindControl("drpdwnClnRmrkAprv");
+                Label lblclientremarks = (Label)(e.Row.FindControl("lblclientremarks"));
+
+                ListItem ddlvalue = drpdwnClnRmrkAprv.Items.FindByText(lblclientremarks.Text);
+                if (ddlvalue != null)
+                {
+                    drpdwnClnRmrkAprv.Items.FindByValue((e.Row.FindControl("lblclientremarks") as Label).Text).Selected = true;
+                }
+            }
+
+            e.Row.Cells[12].Attributes.Add("OnClick", "return showDetalis('" + Convert.ToString(e.Row.Cells[0].Text) + "');");
+        }
+    }
+
+    protected void grdReportApproval_RowUpdating(object sender, GridViewUpdateEventArgs e)
+    {
+        lblCmnt.Text = "";
+        GridViewRow row = (GridViewRow)grdReportApproval.Rows[e.RowIndex];
+
+        string SlNo = row.Cells[0].Text;
+
+        DropDownList ClientRemarks = (DropDownList)(row.FindControl("drpdwnClnRmrkAprv"));
+        TextBox RequestDate = (TextBox)(row.FindControl("txtdateApprv"));
+
+        string ReqDate = "";
+        if (RequestDate.Text != "")
+        {
+            ReqDate = WebUtil.ConvertDate(RequestDate.Text, "dd-MM-yyyy", "yyyy/MM/dd");
+            string today = DateTime.Now.ToString("dd-MM-yyyy");
+            DateTime dt = DateTime.Parse(ReqDate);
+
+            if (dt.Subtract(DateTime.Today).Days > 0)
+            {
+                lblCmnt.Text = "'Date As Per Form'  cannot be greater than " + today + "";
+                return;
+            }
+        }
+
+        if (ClientRemarks.SelectedValue.ToString() == "")
+        {
+            lblCmnt.Text = "Please Select Reason For Closing";
+        }
+        else if (ReqDate == "")
+        {
+            lblCmnt.Text = "Please Enter the Date As Per Form";
+        }
+        else
+        {
+            string[] param = {
+                             "@SerialNo",SlNo,
+                             "@ClientRemarks",ClientRemarks.SelectedValue,
+                             "@RequestDate",ReqDate,
+                             "@Flag","4",
+                             "@Euser",Euser
+                         };
+            DataSet ds = obj.SPGetDS("SpSelectClosureRqstClients", param);
+
+            lblCmnt.Text = ds.Tables[0].Rows[0]["Msg"].ToString();
+            grdReportApproval.EditIndex = -1;
+            fillgrid();
+        }
+    }
+    protected void grdHoReport_RowUpdating(object sender, GridViewUpdateEventArgs e)
+    {
+        lblCmntHO.Text = "";
+        GridViewRow row = (GridViewRow)grdHoReport.Rows[e.RowIndex];
+        string SlNo = row.Cells[0].Text;
+
+        DropDownList ClientRemarks = (DropDownList)(row.FindControl("drpdwnClntRemrkHO"));
+        TextBox RequestDate = (TextBox)(row.FindControl("txtRqstDtHO"));
+
+        string ReqDate = "";
+        if (RequestDate.Text != "")
+        {
+            ReqDate = WebUtil.ConvertDate(RequestDate.Text, "dd-MM-yyyy", "yyyy/MM/dd");
+        }
+
+        if (ClientRemarks.SelectedValue.ToString() == "")
+        {
+            lblCmntHO.Text = "Please Select Reason For Closing";
+        }
+        else if (ReqDate == "")
+        {
+            lblCmntHO.Text = "Please Enter the Date As Per Form";
+        }
+        else
+        {
+            string[] param = {
+                             "@SerialNo",SlNo,
+                             "@ClientRemarks",ClientRemarks.Text,
+                             "@RequestDate",ReqDate,
+                             "@Flag","4",
+                             "@Euser",Euser
+                         };
+            DataSet ds = obj.SPGetDS("SpSelectClosureRqstClients", param);
+
+
+            lblCmntHO.Text = ds.Tables[0].Rows[0]["Msg"].ToString();
+            grdHoReport.EditIndex = -1;
+            fillgridHO();
+        }
+    }
+
+    protected void btnViewHO_Click(object sender, EventArgs e)
+    {
+        grdHoReport.EditIndex = -1;
+        fillgridHO();
+    }
+
+    protected void grdReport_RowDataBound(object sender, GridViewRowEventArgs e)
+    {
+        e.Row.Cells[1].Visible = false;
+        e.Row.Cells[17].Visible = false;
+        e.Row.Cells[20].Visible = false;
+        e.Row.Cells[21].Visible = false;
+        e.Row.Cells[22].Visible = false;
+
+        if (e.Row.RowType == DataControlRowType.DataRow)
+        {
+            Label TradeNm = (Label)(e.Row.FindControl("lblTradeNm"));
+            Label tradePAN = (Label)(e.Row.FindControl("lblclntTradePAN"));
+            Label DPPAN = (Label)(e.Row.FindControl("lblDPpan"));
+            Label DPFrstHldr = (Label)(e.Row.FindControl("lblDPFrstHldr"));
+            Label DPScndHldr = (Label)(e.Row.FindControl("lblDPScndHldr"));
+            Label ThrdHldr = (Label)(e.Row.FindControl("lblThrdHldr"));
+
+            if (e.Row.Cells[10].Text != "0.00")
+            {
+                e.Row.Cells[10].ForeColor = System.Drawing.Color.Red;
+            }
+            if (e.Row.Cells[11].Text != "0.00")
+            {
+                e.Row.Cells[11].ForeColor = System.Drawing.Color.Red;
+            }
+            if (e.Row.Cells[12].Text != "0.00")
+            {
+                e.Row.Cells[12].ForeColor = System.Drawing.Color.Red;
+            }
+            if (e.Row.Cells[14].Text != "0.00")
+            {
+                e.Row.Cells[14].ForeColor = System.Drawing.Color.Red;
+            }
+            if (e.Row.Cells[15].Text == "Y")
+            {
+                e.Row.Cells[15].ForeColor = System.Drawing.Color.Red;
+            }
+            if (e.Row.Cells[16].Text == "Y")
+            {
+                e.Row.Cells[16].ForeColor = System.Drawing.Color.Red;
+            }
+            if (e.Row.Cells[19].Text == "Y")
+            {
+                e.Row.Cells[19].ForeColor = System.Drawing.Color.Red;
+            }
+        }
+    }
+
+    protected void btnUpload_Click(object sender, EventArgs e)
+    {
+        lblMsg.Text = "";
+        if (!Directory.Exists(userFolder))
+        {
+            Directory.CreateDirectory(userFolder);
+        }
+
+        if (fileUploadDP.HasFile)
+        {
+            FileInfo fi = new FileInfo(Path.GetFileName(fileUploadDP.PostedFile.FileName));
+            fileUploadDP.PostedFile.SaveAs((userFolder + "/") + drpdwnForm.SelectedValue + fi.Extension);
+
+            string[] fileTypes = { "bmp", "gif", "png", "jpg", "jpeg", "tif", "tiff", "pdf" };
+            string ext = Path.GetExtension(fileUploadDP.PostedFile.FileName);
+            bool isValidFile = false;
+
+            for (int i = 0; i < fileTypes.Length; i++)
+            {
+                if (ext.ToUpper() == "." + fileTypes[i].ToUpper())
+                {
+                    isValidFile = true;
+                    break;
+                }
+            }
+
+            if (!isValidFile)
+            {
+                lblMsg.Text = "Invalid File. Please upload a File with extension " + string.Join(",", fileTypes);
+                string filepath = (userFolder + "/") + drpdwnForm.SelectedValue + fi.Extension;
+
+                if (File.Exists(filepath))
+                {
+                    File.Delete(filepath);
+                }
+                return;
+            }
+        }
+
+        if (drpdwnForm.SelectedIndex < 5)
+        {
+            drpdwnForm.SelectedIndex = drpdwnForm.SelectedIndex + 1;
+        }
+        filegrid();
+    }
+
+    private void filegrid()
+    {
+        if (Directory.Exists(userFolder))
+        {
+            string[] filePaths = Directory.GetFiles(userFolder);
+            List<ListItem> files = new List<ListItem>();
+            foreach (string filePath in filePaths)
+            {
+                files.Add(new ListItem(Path.GetFileName(filePath), filePath));
+            }
+            GridView1.DataSource = files;
+            GridView1.DataBind();
+        }
+    }
+
+    protected void btnClear_Click(object sender, EventArgs e)
+    {
+        drpdwnForm.SelectedValue = "";
+        drpdwnClosureReason.SelectedValue = "";
+        txtRqstDate.Text = "";
+        GridView1.DataSource = null;
+        GridView1.DataBind();
+        btnSave.Enabled = true;
+
+        if (Directory.Exists(userFolder))
+        {
+            Directory.Delete(userFolder, true);
+        }
+
+    }
+    protected void grdHoReport_RowDataBound(object sender, GridViewRowEventArgs e)
+    {
+        if (e.Row.RowType == DataControlRowType.DataRow)
+        {
+            Label Name = (Label)(e.Row.FindControl("lblTradeNm2"));
+            Label PAN = (Label)(e.Row.FindControl("lblPANNm2"));
+
+            int RowIndex = grdHoReport.PageIndex * grdHoReport.PageSize + e.Row.RowIndex;
+            for (int i = 0; i <= RowIndex; i++)
+            {
+                Name.Text = string.Empty;
+                PAN.Text = string.Empty;
+
+                if (ds3.Tables[0].Rows[i]["Name"].ToString() != "")
+                {
+                    Name.Text = "<b>Trade holder : </b>" + ds3.Tables[0].Rows[i]["Name"] + "<br />";
+                }
+                if (ds3.Tables[0].Rows[i]["DP_Frst_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<b>DP Holder 1 : </b>" + ds3.Tables[0].Rows[i]["DP_Frst_Hldr"];
+                }
+                if (ds3.Tables[0].Rows[i]["Dp_Scnd_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<br /><b>DP Holder 2 : </b>" + ds3.Tables[0].Rows[i]["Dp_Scnd_Hldr"];
+                }
+                if (ds3.Tables[0].Rows[i]["DP_Thrd_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<br /><b>DP Holder 3 : </b>" + ds3.Tables[0].Rows[i]["DP_Thrd_Hldr"];
+                }
+                if (ds3.Tables[0].Rows[i]["Trade_PAN"].ToString() != "")
+                {
+                    PAN.Text = "<b>Trade : </b>" + ds3.Tables[0].Rows[i]["Trade_PAN"] + "<br />";
+                }
+                if (ds3.Tables[0].Rows[i]["DP_Frst_Hldr_PAN"].ToString() != "")
+                {
+                    PAN.Text += "<b>DP : </b>" + ds3.Tables[0].Rows[i]["DP_Frst_Hldr_PAN"];
+                }
+            }
+
+            if (grdHoReport.EditIndex == e.Row.RowIndex)
+            {
+                DropDownList drpdwnClntRemrkHO = (DropDownList)e.Row.FindControl("drpdwnClntRemrkHO");
+                Label Label1ho = (Label)(e.Row.FindControl("Label1ho"));
+
+                ListItem ddlvalue = drpdwnClntRemrkHO.Items.FindByText(Label1ho.Text);
+                if (ddlvalue != null)
+                {
+                    drpdwnClntRemrkHO.Items.FindByValue((e.Row.FindControl("Label1ho") as Label).Text).Selected = true;
+                }
+            }
+            e.Row.Cells[13].Attributes.Add("OnClick", "return showDetalis('" + Convert.ToString(e.Row.Cells[0].Text) + "');");
+        }
+
+    }
+    protected void btnViewDocRec_Click(object sender, EventArgs e)
+    {
+        GridView2.PageIndex = 0;
+
+        fill();
+    }
+    private void fill()
+    {
+        try
+        {
+
+            string Fromdate = "", Todate = "";
+            if (txtFromDtdoc.Text != "")
+            {
+                Fromdate = WebUtil.ConvertDate(txtFromDtdoc.Text, "dd-MM-yyyy", "yyyy/MM/dd");
+            }
+            if (txtTodtDoc.Text != "")
+            {
+                Todate = WebUtil.ConvertDate(txtTodtDoc.Text, "dd-MM-yyyy", "yyyy/MM/dd");
+            }
+
+            if (chkScan.Checked == true)
+                ScanOnly = "Y";
+
+            string[] param = {
+                              "@Flag", "8",
+                              "@serialno",TextBox1.Text.Trim(),
+                              "@fromdate",Fromdate,
+                              "@todate",Todate,
+                              "@Loc",txtLocdoc.Text.Trim(),
+                              "@Region",txtRegionDoc.Text.Trim(),
+                              "@Tradecode",txtTradedoc.Text.Trim(),
+                              "@DpId",drpdwnDpIddoc.SelectedValue,
+                              "@DpClntId",txtDpDoc.Text.Trim(),
+                              "@PAN" ,txtPAN.Text.Trim(),
+                              "@Scan",ScanOnly
+                            };
+
+            dss = obj.SPGetDS("SpSelectClosureRqstClients", param);
+            if (dss.Tables[0].Rows.Count > 0)
+            {
+                Label5.Text = "";
+                GridView2.DataSource = dss.Tables[0];
+                GridView2.DataBind();
+            }
+            else
+            {
+                GridView2.DataSource = null;
+                GridView2.DataBind();
+                Label5.Text = "No Records Found";
+            }
+        }
+        catch (Exception ex)
+        {
+            Label5.Text = ex.Message;
+        }
+    }
+    protected void GridView2_PageIndexChanging(object sender, GridViewPageEventArgs e)
+    {
+        GridView2.PageIndex = e.NewPageIndex;
+        fill();
+    }
+    protected void GridView2_RowCommand(object sender, GridViewCommandEventArgs e)
+    {
+        try
+        {
+
+            if (e.CommandName == "Save")
+            {
+                int index = Convert.ToInt32(e.CommandArgument.ToString());
+                string serialNo = GridView2.Rows[index].Cells[0].Text;
+
+
+                string[] param = {
+                                "@Flag" , "9",
+                                "@SerialNo",serialNo,
+                                "@Euser",Euser
+                              };
+                DataSet ds = obj.SPGetDS("SpSelectClosureRqstClients", param);
+
+                if (ds.Tables[0].Rows.Count > 0)
+                {
+                    Label5.Text = ds.Tables[0].Rows[0]["Msg"].ToString();
+
+                    fill();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Label5.Text = ex.Message;
+        }
+    }
+    protected void btnExport_Click(object sender, EventArgs e)
+    {
+        fill();
+
+
+        if (dss.Tables[0].Rows.Count > 0)
+        {
+            HtmlForm form = new HtmlForm();
+            GridView GW = new GridView();
+            string attachment = "attachment; filename = Export.xls";
+            System.Web.HttpContext.Current.Response.ClearContent();
+            System.Web.HttpContext.Current.Response.AddHeader("content-disposition", attachment);
+            System.Web.HttpContext.Current.Response.ContentType = "application/ms-excel";
+            StringWriter stw = new StringWriter();
+            HtmlTextWriter htextw = new HtmlTextWriter(stw);
+            GW.DataSource = dss.Tables[0];
+            GW.DataBind();
+            form.Controls.Add(GW);
+            this.Controls.Add(form);
+            form.RenderControl(htextw);
+            System.Web.HttpContext.Current.Response.Write(stw.ToString());
+            System.Web.HttpContext.Current.Response.End();
+        }
+        else
+        {
+            Label5.Text = "Nothing To Export";
+        }
+    }
+    protected void drpdwnDpIddoc_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        string sql1;
+        txtDpDoc.Text = "";
+
+
+        if ((drpdwnDpIddoc.SelectedValue.ToString() == "12048900"))
+        {
+            sql1 = "select top 50 dpid,CLNT_ID,hldr_incmtx_pan,DP_INT_REF_NO FROM CDSLCLNTMSTR(nolock) where 1=1";
+            imbtnDpDoc.Attributes.Add("OnClick", "return search(5,'" + sql1 + "','Location,CLNT_ID,hldr_incmtx_pan','','Location','CLNT_ID','txtDpDoc','No','N');");
+        }
+        else
+        {
+            sql1 = "select top 50 dpid,CLNT_ID,Frst_hldr_fin_dtl FROM NSDclnt_mstr(nolock) where 1=1";
+            imbtnDpDoc.Attributes.Add("OnClick", "return search(5,'" + sql1 + "','dpid,CLNT_ID,Frst_hldr_fin_dtl','','Location','CLNT_ID','txtDpDoc','No','N');");
+        }
+    }
+    protected void btnClr_Click(object sender, EventArgs e)
+    {
+        cleardoc();
+    }
+    private void cleardoc()
+    {
+        Label5.Text = "";
+        txtRegionDoc.Text = "";
+        txtDpDoc.Text = "";
+        txtLocdoc.Text = "";
+        txtTradedoc.Text = "";
+        TextBox1.Text = "";
+        drpdwnDpIddoc.SelectedValue = "";
+        GridView2.DataSource = null;
+        GridView2.DataBind();
+        txtPAN.Text = "";
+        chkScan.Checked = false;
+        txtFromDtdoc.Text = DateTime.Now.ToString("dd-MM-yyyy");
+        txtTodtDoc.Text = DateTime.Now.ToString("dd-MM-yyyy");
+    }
+
+    protected void btnViewBrRprt_Click(object sender, EventArgs e)
+    {
+        fillgrid();
+    }
+
+    protected void GridView2_RowDataBound(object sender, GridViewRowEventArgs e)
+    {
+        if (e.Row.RowType == DataControlRowType.DataRow)
+        {
+            Label Name = (Label)(e.Row.FindControl("lblTradeNmdoc"));
+            Label PAN = (Label)(e.Row.FindControl("lblclntTradePANdoc"));
+            Label Status = (Label)(e.Row.FindControl("lblStatus"));
+            Label Date = (Label)(e.Row.FindControl("lblClosure"));
+
+            int RowIndex = GridView2.PageIndex * GridView2.PageSize + e.Row.RowIndex;
+            for (int i = 0; i <= RowIndex; i++)
+            {
+                Name.Text = string.Empty;
+                PAN.Text = string.Empty;
+                Status.Text = string.Empty;
+                Date.Text = string.Empty;
+
+                if (dss.Tables[0].Rows[i]["Name"].ToString() != "")
+                {
+                    Name.Text = "<b>Trade Holder : </b>" + dss.Tables[0].Rows[i]["Name"] + "<br />";
+                }
+                if (dss.Tables[0].Rows[i]["DP_Frst_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<b>DP Holder 1 : </b>" + dss.Tables[0].Rows[i]["DP_Frst_Hldr"];
+                }
+                if (dss.Tables[0].Rows[i]["Dp_Scnd_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<br /><b>DP Holder 2 : </b>" + dss.Tables[0].Rows[i]["Dp_Scnd_Hldr"];
+                }
+                if (dss.Tables[0].Rows[i]["DP_Thrd_Hldr"].ToString() != "")
+                {
+                    Name.Text += "<br /><b>DP Holder 3 : </b>" + dss.Tables[0].Rows[i]["DP_Thrd_Hldr"];
+                }
+
+                if (dss.Tables[0].Rows[i]["Trade_PAN"].ToString() != "")
+                {
+                    PAN.Text = "<b>Trade : </b>" + dss.Tables[0].Rows[i]["Trade_PAN"] + "<br />";
+                }
+                if (dss.Tables[0].Rows[i]["DP_Frst_Hldr_PAN"].ToString() != "")
+                {
+                    PAN.Text += "<b>DP : </b>" + dss.Tables[0].Rows[i]["DP_Frst_Hldr_PAN"];
+                }
+
+                if (dss.Tables[0].Rows[i]["TradeStatus"].ToString() != "")
+                {
+                    Status.Text = "<b>Trade : </b>" + dss.Tables[0].Rows[i]["TradeStatus"] + "<br />";
+                }
+                if (dss.Tables[0].Rows[i]["DPStatus"].ToString() != "")
+                {
+                    Status.Text += "<b>DP : </b>" + dss.Tables[0].Rows[i]["DPStatus"] + "<br />";
+                }
+
+                if (dss.Tables[0].Rows[i]["TradeAcClosedDate"].ToString() != "")
+                {
+                    Date.Text = "<b>Trade : </b>" + dss.Tables[0].Rows[i]["TradeAcClosedDate"] + "<br />";
+                }
+                if (dss.Tables[0].Rows[i]["DPClosedDate"].ToString() != "")
+                {
+                    Date.Text += "<b>DP : </b>" + dss.Tables[0].Rows[i]["DPClosedDate"] + "<br />";
+                }
+            }
+        }
+    }
+}
